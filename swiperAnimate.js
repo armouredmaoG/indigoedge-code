@@ -154,44 +154,34 @@ function setStackState(sw) {
 //   const activeSlide = slides[activeIndex];
 //   if (!activeSlide) return;
 
-//   // Safari layout flush
-//   void sw.el.offsetHeight;
-
-//   // ── SLIDE READS (offset-based — all slides share the same wrapper,
-//   //    so relative offsetLeft values are correct regardless of transforms) ──
-//   const activeOL = activeSlide.offsetLeft;
-//   const activeOW = activeSlide.offsetWidth;
-//   const activeOCenter = activeOL + activeOW / 2;
-
-//   const slideData = slides.map((slide, i) => ({
-//     slide,
-//     ol: slide.offsetLeft,
-//     ow: slide.offsetWidth,
-//     depth: Math.abs(i - activeIndex),
-//   }));
-
-//   // ── HEADING READS (getBoundingClientRect — headings & active slide are
-//   //    in the same Lenis container, so Lenis shift cancels out in the
-//   //    relative calculation; only their visual distance matters) ──
+//   // ── ALL READS FIRST ──────────────────────────────
+//   sw.el.getBoundingClientRect(); // Safari flush
+//   const activeRect = activeSlide.getBoundingClientRect();
+//   const activeCenter = activeRect.left + activeRect.width / 2;
 //   const headingLeft = document.querySelector("[deal-heading-left]");
 //   const headingRight = document.querySelector("[deal-heading-right]");
 
-//   if (headingLeft && headingRight) {
-//     gsap.set([headingLeft, headingRight], { x: 0 });
-//     headingLeft.getBoundingClientRect(); // flush after reset
-//   }
+//   const slideData = slides.map((slide, i) => ({
+//     slide,
+//     rect: slide.getBoundingClientRect(),
+//     depth: Math.abs(i - activeIndex),
+//   }));
 
-//   const activeRect = activeSlide.getBoundingClientRect();
+//   // Reset headings to x:0 and re-read (need a flush here)
+//   gsap.set([headingLeft, headingRight], { x: 0 });
+//   // Force a synchronous layout flush after reset
+//   headingLeft?.getBoundingClientRect();
+
 //   const leftRect = headingLeft?.getBoundingClientRect();
 //   const rightRect = headingRight?.getBoundingClientRect();
 
-//   // ── ALL WRITES ──
+//   // ── ALL WRITES AFTER ─────────────────────────────
 //   sw.allowTouchMove = false;
 //   gsap.set("[deals-cards-text]", { opacity: 0 });
 
-//   slideData.forEach(({ slide, ol, ow, depth }) => {
-//     const slideCenter = ol + ow / 2;
-//     const dx = activeOCenter - slideCenter;
+//   slideData.forEach(({ slide, rect, depth }) => {
+//     const slideCenter = rect.left + rect.width / 2;
+//     const dx = activeCenter - slideCenter;
 //     gsap.set(slide, {
 //       x: dx,
 //       y: isSafari ? depth * 6 : 0,
@@ -210,35 +200,120 @@ function setStackState(sw) {
 
 //   gsap.set(headingLeft, { x: dxLeft });
 //   gsap.set(headingRight, { x: dxRight });
+//   console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
 // }
 
 /* -----------------------------
-   SAFE REVEAL TRIGGER
+   ANIMATE TO STACK (smooth — for scroll-back)
+   Uses CURRENT activeIndex so it stacks
+   to whichever card the user swiped to.
+----------------------------- */
+
+function animateToStack(sw, duration) {
+  const slides = Array.from(sw.slides);
+  const activeIndex = sw.activeIndex;
+  const activeSlide = slides[activeIndex];
+  if (!activeSlide) return;
+
+  disableInteraction(sw, slides);
+
+  sw.el.getBoundingClientRect(); // Safari flush
+  const activeRect = activeSlide.getBoundingClientRect();
+  const activeCenter = activeRect.left + activeRect.width / 2;
+
+  const headingLeft = document.querySelector("[deal-heading-left]");
+  const headingRight = document.querySelector("[deal-heading-right]");
+
+  slides.forEach((slide, i) => {
+    const rect = slide.getBoundingClientRect();
+    const slideCenter = rect.left + rect.width / 2;
+    const dx = activeCenter - slideCenter;
+    const depth = Math.abs(i - activeIndex);
+
+    gsap.to(slide, {
+      x: dx,
+      y: isSafari ? depth * 6 : 0,
+      scale: 1,
+      zIndex: 100 - depth,
+      duration: duration,
+      ease: "power3.inOut",
+      overwrite: true,
+    });
+  });
+
+  gsap.to("[deals-cards-text]", {
+    opacity: 0,
+    duration: duration * 0.6,
+    overwrite: true,
+  });
+
+  if (!headingLeft || !headingRight) return;
+
+  // Reset to measure natural positions
+  gsap.set([headingLeft, headingRight], { x: 0 });
+  headingLeft.getBoundingClientRect();
+
+  const leftRect = headingLeft.getBoundingClientRect();
+  const rightRect = headingRight.getBoundingClientRect();
+
+  const dxLeft = activeRect.left - (leftRect.right + 64);
+  const dxRight = activeRect.right - (rightRect.left - 64);
+
+  gsap.to(headingLeft, {
+    x: dxLeft,
+    duration: duration,
+    ease: "power3.inOut",
+    overwrite: true,
+  });
+  gsap.to(headingRight, {
+    x: dxRight,
+    duration: duration,
+    ease: "power3.inOut",
+    overwrite: true,
+  });
+}
+
+/* -----------------------------
+   REVEAL / STACK TRIGGER
 ----------------------------- */
 
 function createRevealTrigger(sw) {
-  const swiperTrigger = document.querySelector("[swiper-trigger]") || sw.el;
+  const triggerEl =
+    sw.el.closest("section") || sw.el.closest(".section") || sw.el;
+  const slides = Array.from(sw.slides);
+  const headings = document.querySelectorAll("[deals-heading]");
 
-  function safeReveal() {
-    if (revealInitialized) return;
-    revealInitialized = true;
-    setupReveal(sw);
-  }
+  gsap.set(headings, { willChange: "transform", force3D: true });
+
+  let isRevealed = false;
 
   ScrollTrigger.create({
-    trigger: swiperTrigger,
-    start: "top 90%",
-    end: "top 20%",
-    once: true,
-    //markers: true,
+    trigger: triggerEl,
+    start: "top 80%",
+    // markers: true,
 
-    onEnter: safeReveal,
-    onEnterBack: safeReveal,
+    onEnter: () => {
+      if (isRevealed) return;
+      isRevealed = true;
+      revealCards(sw, slides, headings);
+    },
+
+    onEnterBack: () => {
+      if (isRevealed) return;
+      isRevealed = true;
+      revealCards(sw, slides, headings);
+    },
+
+    onLeaveBack: () => {
+      if (!isRevealed) return;
+      isRevealed = false;
+      animateToStack(sw, 0.7);
+    },
 
     onRefresh(self) {
-      // Handles page refresh below the section
-      if (self.isActive || self.progress > 0) {
-        safeReveal();
+      if (!isRevealed && (self.isActive || self.progress > 0)) {
+        isRevealed = true;
+        revealCards(sw, slides, headings);
       }
     },
   });
@@ -248,36 +323,18 @@ function createRevealTrigger(sw) {
    REVEAL ANIMATION
 ----------------------------- */
 
-function setupReveal(sw) {
-  if (revealed) return;
-  revealed = true;
+function revealCards(sw, slides, headings) {
+  // Kill any in-flight stack tweens
+  slides.forEach((s) => gsap.killTweensOf(s));
+  gsap.killTweensOf("[deals-cards-text]");
+  headings.forEach((h) => gsap.killTweensOf(h));
 
-  const slides = Array.from(sw.slides);
-  const triggerEl =
-    sw.el.closest("section") || sw.el.closest(".section") || sw.el;
-
-  const headings = document.querySelectorAll("[deals-heading]");
-  gsap.set(headings, { willChange: "transform", force3D: true });
-
-  disableInteraction(sw, slides);
-
-  const tl = gsap.timeline({
-    defaults: { duration: 0.9, ease: "power3.out" },
-
-    scrollTrigger: {
-      trigger: triggerEl,
-      start: "top 10%",
-      // markers: true,
-      fastScrollEnd: true,
-      preventOverlaps: true,
-      invalidateOnRefresh: true,
-    },
-  });
-
-  tl.to(slides, {
+  gsap.to(slides, {
     x: 0,
     y: 0,
     scale: 1,
+    duration: 0.9,
+    ease: "power3.out",
     stagger: { each: 0.06, from: sw.activeIndex },
 
     onComplete: () => {
@@ -292,17 +349,22 @@ function setupReveal(sw) {
       sw.update();
       ScrollTrigger.refresh();
     },
-  })
-    .to(
-      headings,
-      {
-        x: 0,
-        overwrite: "auto",
-        force3D: true,
-      },
-      "<"
-    )
-    .to("[deals-cards-text]", { opacity: 1 });
+  });
+
+  gsap.to(headings, {
+    x: 0,
+    duration: 0.9,
+    ease: "power3.out",
+    overwrite: true,
+    force3D: true,
+  });
+
+  gsap.to("[deals-cards-text]", {
+    opacity: 1,
+    duration: 0.9,
+    ease: "power3.out",
+    delay: 0.3,
+  });
 }
 
 /* -----------------------------
