@@ -94,89 +94,40 @@ const swiper = new Swiper(swiperEl, {
    STACK STATE
 ----------------------------- */
 
-function setStackState(sw) {
-  const slides = Array.from(sw.slides);
-  const activeIndex = sw.activeIndex;
-  const activeSlide = slides[activeIndex];
-  if (!activeSlide) return;
-
-  // ── ALL READS FIRST ──────────────────────────────
-  // Use offsetLeft/offsetWidth instead of getBoundingClientRect
-  // so values are stable regardless of Lenis scroll interpolation
-  void sw.el.offsetHeight; // Safari layout flush
-
-  const activeLeft = activeSlide.offsetLeft;
-  const activeWidth = activeSlide.offsetWidth;
-  const activeCenter = activeLeft + activeWidth / 2;
-
-  const headingLeft = document.querySelector("[deal-heading-left]");
-  const headingRight = document.querySelector("[deal-heading-right]");
-
-  const slideData = slides.map((slide, i) => ({
-    slide,
-    offsetLeft: slide.offsetLeft,
-    offsetWidth: slide.offsetWidth,
-    depth: Math.abs(i - activeIndex),
-  }));
-
-  // Reset headings to x:0 and re-read
-  gsap.set([headingLeft, headingRight], { x: 0 });
-  void headingLeft?.offsetHeight; // Force layout flush after reset
-
-  const leftOL = headingLeft?.offsetLeft;
-  const leftOW = headingLeft?.offsetWidth;
-  const rightOL = headingRight?.offsetLeft;
-
-  // ── ALL WRITES AFTER ─────────────────────────────
-  sw.allowTouchMove = false;
-  gsap.set("[deals-cards-text]", { opacity: 0 });
-
-  slideData.forEach(({ slide, offsetLeft, offsetWidth, depth }) => {
-    const slideCenter = offsetLeft + offsetWidth / 2;
-    const dx = activeCenter - slideCenter;
-    gsap.set(slide, {
-      x: dx,
-      y: isSafari ? depth * 6 : 0,
-      scale: 1,
-      zIndex: 100 - depth,
-      willChange: "transform",
-      pointerEvents: "none",
-      force3D: true,
-    });
-  });
-
-  if (!headingLeft || !headingRight || leftOL == null || rightOL == null) return;
-
-  const leftRight = leftOL + leftOW; // right edge of left heading
-  const dxLeft = activeLeft - (leftRight + 64);
-  const dxRight = (activeLeft + activeWidth) - (rightOL - 64);
-
-  gsap.set(headingLeft, { x: dxLeft });
-  gsap.set(headingRight, { x: dxRight });
-  console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
-}
 // function setStackState(sw) {
 //   const slides = Array.from(sw.slides);
 //   const activeIndex = sw.activeIndex;
 //   const activeSlide = slides[activeIndex];
 //   if (!activeSlide) return;
 
-//   // Safari layout flush
-//   sw.el.getBoundingClientRect();
-
+//   // ── ALL READS FIRST ──────────────────────────────
+//   sw.el.getBoundingClientRect(); // Safari flush
 //   const activeRect = activeSlide.getBoundingClientRect();
 //   const activeCenter = activeRect.left + activeRect.width / 2;
+//   const headingLeft = document.querySelector("[deal-heading-left]");
+//   const headingRight = document.querySelector("[deal-heading-right]");
 
+//   const slideData = slides.map((slide, i) => ({
+//     slide,
+//     rect: slide.getBoundingClientRect(),
+//     depth: Math.abs(i - activeIndex),
+//   }));
+
+//   // Reset headings to x:0 and re-read (need a flush here)
+//   gsap.set([headingLeft, headingRight], { x: 0 });
+//   // Force a synchronous layout flush after reset
+//   headingLeft?.getBoundingClientRect();
+
+//   const leftRect = headingLeft?.getBoundingClientRect();
+//   const rightRect = headingRight?.getBoundingClientRect();
+
+//   // ── ALL WRITES AFTER ─────────────────────────────
 //   sw.allowTouchMove = false;
-
 //   gsap.set("[deals-cards-text]", { opacity: 0 });
 
-//   slides.forEach((slide, i) => {
-//     const rect = slide.getBoundingClientRect();
+//   slideData.forEach(({ slide, rect, depth }) => {
 //     const slideCenter = rect.left + rect.width / 2;
 //     const dx = activeCenter - slideCenter;
-//     const depth = Math.abs(i - activeIndex);
-
 //     gsap.set(slide, {
 //       x: dx,
 //       y: isSafari ? depth * 6 : 0,
@@ -188,22 +139,64 @@ function setStackState(sw) {
 //     });
 //   });
 
-//   // Headings alignment
-//   const headingLeft = document.querySelector("[deal-heading-left]");
-//   const headingRight = document.querySelector("[deal-heading-right]");
-//   if (!headingLeft || !headingRight) return;
-
-//   gsap.set([headingLeft, headingRight], { x: 0 });
-
-//   const leftRect = headingLeft.getBoundingClientRect();
-//   const rightRect = headingRight.getBoundingClientRect();
+//   if (!headingLeft || !headingRight || !leftRect || !rightRect) return;
 
 //   const dxLeft = activeRect.left - (leftRect.right + 64);
 //   const dxRight = activeRect.right - (rightRect.left - 64);
 
 //   gsap.set(headingLeft, { x: dxLeft });
 //   gsap.set(headingRight, { x: dxRight });
+//   console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
 // }
+function setStackState(sw) {
+  const slides = Array.from(sw.slides);
+  const activeIndex = sw.activeIndex;
+  const activeSlide = slides[activeIndex];
+  if (!activeSlide) return;
+
+  // Safari layout flush
+  sw.el.getBoundingClientRect();
+
+  const activeRect = activeSlide.getBoundingClientRect();
+  const activeCenter = activeRect.left + activeRect.width / 2;
+
+  sw.allowTouchMove = false;
+
+  gsap.set("[deals-cards-text]", { opacity: 0 });
+
+  slides.forEach((slide, i) => {
+    const rect = slide.getBoundingClientRect();
+    const slideCenter = rect.left + rect.width / 2;
+    const dx = activeCenter - slideCenter;
+    const depth = Math.abs(i - activeIndex);
+
+    gsap.set(slide, {
+      x: dx,
+      y: isSafari ? depth * 6 : 0,
+      scale: 1,
+      zIndex: 100 - depth,
+      willChange: "transform",
+      pointerEvents: "none",
+      force3D: true,
+    });
+  });
+
+  // Headings alignment
+  const headingLeft = document.querySelector("[deal-heading-left]");
+  const headingRight = document.querySelector("[deal-heading-right]");
+  if (!headingLeft || !headingRight) return;
+
+  gsap.set([headingLeft, headingRight], { x: 0 });
+
+  const leftRect = headingLeft.getBoundingClientRect();
+  const rightRect = headingRight.getBoundingClientRect();
+
+  const dxLeft = activeRect.left - (leftRect.right + 64);
+  const dxRight = activeRect.right - (rightRect.left - 64);
+
+  gsap.set(headingLeft, { x: dxLeft });
+  gsap.set(headingRight, { x: dxRight });
+}
 
 /* -----------------------------
    SAFE REVEAL TRIGGER
