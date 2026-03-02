@@ -94,104 +94,40 @@ const swiper = new Swiper(swiperEl, {
    STACK STATE
 ----------------------------- */
 
-// function setStackState(sw) {
-//   const slides = Array.from(sw.slides);
-//   const activeIndex = sw.activeIndex;
-//   const activeSlide = slides[activeIndex];
-//   if (!activeSlide) return;
-
-//   // ── ALL READS FIRST ──────────────────────────────
-//   sw.el.getBoundingClientRect(); // Safari flush
-//   const activeRect = activeSlide.getBoundingClientRect();
-//   const activeCenter = activeRect.left + activeRect.width / 2;
-//   const headingLeft = document.querySelector("[deal-heading-left]");
-//   const headingRight = document.querySelector("[deal-heading-right]");
-
-//   const slideData = slides.map((slide, i) => ({
-//     slide,
-//     rect: slide.getBoundingClientRect(),
-//     depth: Math.abs(i - activeIndex),
-//   }));
-
-//   // Reset headings to x:0 and re-read (need a flush here)
-//   gsap.set([headingLeft, headingRight], { x: 0 });
-//   // Force a synchronous layout flush after reset
-//   headingLeft?.getBoundingClientRect();
-
-//   const leftRect = headingLeft?.getBoundingClientRect();
-//   const rightRect = headingRight?.getBoundingClientRect();
-
-//   // ── ALL WRITES AFTER ─────────────────────────────
-//   sw.allowTouchMove = false;
-//   gsap.set("[deals-cards-text]", { opacity: 0 });
-
-//   slideData.forEach(({ slide, rect, depth }) => {
-//     const slideCenter = rect.left + rect.width / 2;
-//     const dx = activeCenter - slideCenter;
-//     gsap.set(slide, {
-//       x: dx,
-//       y: isSafari ? depth * 6 : 0,
-//       scale: 1,
-//       zIndex: 100 - depth,
-//       willChange: "transform",
-//       pointerEvents: "none",
-//       force3D: true,
-//     });
-//   });
-
-//   if (!headingLeft || !headingRight || !leftRect || !rightRect) return;
-
-//   const dxLeft = activeRect.left - (leftRect.right + 64);
-//   const dxRight = activeRect.right - (rightRect.left - 64);
-
-//   gsap.set(headingLeft, { x: dxLeft });
-//   gsap.set(headingRight, { x: dxRight });
-//   console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
-// }
 function setStackState(sw) {
   const slides = Array.from(sw.slides);
   const activeIndex = sw.activeIndex;
   const activeSlide = slides[activeIndex];
   if (!activeSlide) return;
 
-  // Safari layout flush
-  void sw.el.offsetHeight;
-
-  // ── SLIDE READS (offset-based — all slides share the same wrapper,
-  //    so relative offsetLeft values are correct regardless of transforms) ──
-  const activeOL = activeSlide.offsetLeft;
-  const activeOW = activeSlide.offsetWidth;
-  const activeOCenter = activeOL + activeOW / 2;
-
-  const slideData = slides.map((slide, i) => ({
-    slide,
-    ol: slide.offsetLeft,
-    ow: slide.offsetWidth,
-    depth: Math.abs(i - activeIndex),
-  }));
-
-  // ── HEADING READS (getBoundingClientRect — headings & active slide are
-  //    in the same Lenis container, so Lenis shift cancels out in the
-  //    relative calculation; only their visual distance matters) ──
+  // ── ALL READS FIRST ──────────────────────────────
+  sw.el.getBoundingClientRect(); // Safari flush
+  const activeRect = activeSlide.getBoundingClientRect();
+  const activeCenter = activeRect.left + activeRect.width / 2;
   const headingLeft = document.querySelector("[deal-heading-left]");
   const headingRight = document.querySelector("[deal-heading-right]");
 
-  if (headingLeft && headingRight) {
-    gsap.set([headingLeft, headingRight], { x: 0 });
-    headingLeft.getBoundingClientRect(); // flush after reset
-  }
+  const slideData = slides.map((slide, i) => ({
+    slide,
+    rect: slide.getBoundingClientRect(),
+    depth: Math.abs(i - activeIndex),
+  }));
 
-  const activeRect = activeSlide.getBoundingClientRect();
+  // Reset headings to x:0 and re-read (need a flush here)
+  gsap.set([headingLeft, headingRight], { x: 0 });
+  // Force a synchronous layout flush after reset
+  headingLeft?.getBoundingClientRect();
+
   const leftRect = headingLeft?.getBoundingClientRect();
   const rightRect = headingRight?.getBoundingClientRect();
 
-  // ── ALL WRITES ──
+  // ── ALL WRITES AFTER ─────────────────────────────
   sw.allowTouchMove = false;
   gsap.set("[deals-cards-text]", { opacity: 0 });
 
-  slideData.forEach(({ slide, ol, ow, depth }) => {
-    const slideCenter = ol + ow / 2;
-    const dx = activeOCenter - slideCenter;
+  slideData.forEach(({ slide, rect, depth }) => {
+    const slideCenter = rect.left + rect.width / 2;
+    const dx = activeCenter - slideCenter;
     gsap.set(slide, {
       x: dx,
       y: isSafari ? depth * 6 : 0,
@@ -210,7 +146,71 @@ function setStackState(sw) {
 
   gsap.set(headingLeft, { x: dxLeft });
   gsap.set(headingRight, { x: dxRight });
+  console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
 }
+// function setStackState(sw) {
+//   const slides = Array.from(sw.slides);
+//   const activeIndex = sw.activeIndex;
+//   const activeSlide = slides[activeIndex];
+//   if (!activeSlide) return;
+
+//   // Safari layout flush
+//   void sw.el.offsetHeight;
+
+//   // ── SLIDE READS (offset-based — all slides share the same wrapper,
+//   //    so relative offsetLeft values are correct regardless of transforms) ──
+//   const activeOL = activeSlide.offsetLeft;
+//   const activeOW = activeSlide.offsetWidth;
+//   const activeOCenter = activeOL + activeOW / 2;
+
+//   const slideData = slides.map((slide, i) => ({
+//     slide,
+//     ol: slide.offsetLeft,
+//     ow: slide.offsetWidth,
+//     depth: Math.abs(i - activeIndex),
+//   }));
+
+//   // ── HEADING READS (getBoundingClientRect — headings & active slide are
+//   //    in the same Lenis container, so Lenis shift cancels out in the
+//   //    relative calculation; only their visual distance matters) ──
+//   const headingLeft = document.querySelector("[deal-heading-left]");
+//   const headingRight = document.querySelector("[deal-heading-right]");
+
+//   if (headingLeft && headingRight) {
+//     gsap.set([headingLeft, headingRight], { x: 0 });
+//     headingLeft.getBoundingClientRect(); // flush after reset
+//   }
+
+//   const activeRect = activeSlide.getBoundingClientRect();
+//   const leftRect = headingLeft?.getBoundingClientRect();
+//   const rightRect = headingRight?.getBoundingClientRect();
+
+//   // ── ALL WRITES ──
+//   sw.allowTouchMove = false;
+//   gsap.set("[deals-cards-text]", { opacity: 0 });
+
+//   slideData.forEach(({ slide, ol, ow, depth }) => {
+//     const slideCenter = ol + ow / 2;
+//     const dx = activeOCenter - slideCenter;
+//     gsap.set(slide, {
+//       x: dx,
+//       y: isSafari ? depth * 6 : 0,
+//       scale: 1,
+//       zIndex: 100 - depth,
+//       willChange: "transform",
+//       pointerEvents: "none",
+//       force3D: true,
+//     });
+//   });
+
+//   if (!headingLeft || !headingRight || !leftRect || !rightRect) return;
+
+//   const dxLeft = activeRect.left - (leftRect.right + 64);
+//   const dxRight = activeRect.right - (rightRect.left - 64);
+
+//   gsap.set(headingLeft, { x: dxLeft });
+//   gsap.set(headingRight, { x: dxRight });
+// }
 
 /* -----------------------------
    SAFE REVEAL TRIGGER
