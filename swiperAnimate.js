@@ -289,25 +289,14 @@ function createRevealTrigger(sw) {
 
   ScrollTrigger.create({
     trigger: triggerEl,
-    start: "top 80%",
+    start: "top top",
+    once: true,
     // markers: true,
 
     onEnter: () => {
       if (isRevealed) return;
       isRevealed = true;
       revealCards(sw, slides, headings);
-    },
-
-    onEnterBack: () => {
-      if (isRevealed) return;
-      isRevealed = true;
-      revealCards(sw, slides, headings);
-    },
-
-    onLeaveBack: () => {
-      if (!isRevealed) return;
-      isRevealed = false;
-      animateToStack(sw, 0.7);
     },
 
     onRefresh(self) {
