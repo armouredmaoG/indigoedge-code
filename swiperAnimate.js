@@ -148,16 +148,6 @@ const swiper = new Swiper(swiperEl, {
 //   gsap.set(headingRight, { x: dxRight });
 //   console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
 // }
-/* ── Helper: absolute page-left (immune to CSS transforms / Lenis) ── */
-function getPageLeft(el) {
-  let left = 0;
-  while (el) {
-    left += el.offsetLeft;
-    el = el.offsetParent;
-  }
-  return left;
-}
-
 function setStackState(sw) {
   const slides = Array.from(sw.slides);
   const activeIndex = sw.activeIndex;
@@ -167,38 +157,41 @@ function setStackState(sw) {
   // Safari layout flush
   void sw.el.offsetHeight;
 
-  // ── ALL READS (offset-based, transform-independent) ──
-  const activeLeft = getPageLeft(activeSlide);
-  const activeWidth = activeSlide.offsetWidth;
-  const activeCenter = activeLeft + activeWidth / 2;
+  // ── SLIDE READS (offset-based — all slides share the same wrapper,
+  //    so relative offsetLeft values are correct regardless of transforms) ──
+  const activeOL = activeSlide.offsetLeft;
+  const activeOW = activeSlide.offsetWidth;
+  const activeOCenter = activeOL + activeOW / 2;
 
   const slideData = slides.map((slide, i) => ({
     slide,
-    pageLeft: getPageLeft(slide),
-    width: slide.offsetWidth,
+    ol: slide.offsetLeft,
+    ow: slide.offsetWidth,
     depth: Math.abs(i - activeIndex),
   }));
 
+  // ── HEADING READS (getBoundingClientRect — headings & active slide are
+  //    in the same Lenis container, so Lenis shift cancels out in the
+  //    relative calculation; only their visual distance matters) ──
   const headingLeft = document.querySelector("[deal-heading-left]");
   const headingRight = document.querySelector("[deal-heading-right]");
 
-  // Reset heading transforms before measuring
   if (headingLeft && headingRight) {
     gsap.set([headingLeft, headingRight], { x: 0 });
-    void headingLeft.offsetHeight; // flush
+    headingLeft.getBoundingClientRect(); // flush after reset
   }
 
-  const leftPageLeft = headingLeft ? getPageLeft(headingLeft) : 0;
-  const leftWidth = headingLeft ? headingLeft.offsetWidth : 0;
-  const rightPageLeft = headingRight ? getPageLeft(headingRight) : 0;
+  const activeRect = activeSlide.getBoundingClientRect();
+  const leftRect = headingLeft?.getBoundingClientRect();
+  const rightRect = headingRight?.getBoundingClientRect();
 
   // ── ALL WRITES ──
   sw.allowTouchMove = false;
   gsap.set("[deals-cards-text]", { opacity: 0 });
 
-  slideData.forEach(({ slide, pageLeft, width, depth }) => {
-    const slideCenter = pageLeft + width / 2;
-    const dx = activeCenter - slideCenter;
+  slideData.forEach(({ slide, ol, ow, depth }) => {
+    const slideCenter = ol + ow / 2;
+    const dx = activeOCenter - slideCenter;
     gsap.set(slide, {
       x: dx,
       y: isSafari ? depth * 6 : 0,
@@ -210,11 +203,10 @@ function setStackState(sw) {
     });
   });
 
-  if (!headingLeft || !headingRight) return;
+  if (!headingLeft || !headingRight || !leftRect || !rightRect) return;
 
-  const leftRight = leftPageLeft + leftWidth; // right edge of left heading
-  const dxLeft = activeLeft - (leftRight + 64);
-  const dxRight = activeLeft + activeWidth - (rightPageLeft - 64);
+  const dxLeft = activeRect.left - (leftRect.right + 64);
+  const dxRight = activeRect.right - (rightRect.left - 64);
 
   gsap.set(headingLeft, { x: dxLeft });
   gsap.set(headingRight, { x: dxRight });
