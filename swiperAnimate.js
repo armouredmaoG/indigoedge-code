@@ -146,6 +146,7 @@ function setStackState(sw) {
 
   gsap.set(headingLeft, { x: dxLeft });
   gsap.set(headingRight, { x: dxRight });
+  console.log("Stack state set with dxLeft:", dxLeft, "dxRight:", dxRight);
 }
 // function setStackState(sw) {
 //   const slides = Array.from(sw.slides);
